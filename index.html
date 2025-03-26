@@ -238,6 +238,12 @@
         .form-container {
             animation: fadeIn 0.5s ease-out;
         }
+        
+        /* Download button */
+        .download-btn {
+            background-color: var(--success);
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -249,7 +255,7 @@
         // Main App State
         const state = {
             currentView: 'home',
-            users: JSON.parse(localStorage.getItem('users')) || [],
+            users: [],
             adminCredentials: {
                 username: 'admin',
                 password: 'admin123'
@@ -257,6 +263,33 @@
             loggedInUser: null,
             isAdmin: false
         };
+
+        // Initialize data from JSON file if exists
+        function initializeData() {
+            try {
+                const storedData = localStorage.getItem('authSystemData');
+                if (storedData) {
+                    const parsedData = JSON.parse(storedData);
+                    state.users = parsedData.users || [];
+                    
+                    // Check if admin credentials exist in storage
+                    if (parsedData.adminCredentials) {
+                        state.adminCredentials = parsedData.adminCredentials;
+                    }
+                }
+            } catch (e) {
+                console.error("Error loading data:", e);
+            }
+        }
+
+        // Save data to localStorage as JSON
+        function saveData() {
+            const dataToSave = {
+                users: state.users,
+                adminCredentials: state.adminCredentials
+            };
+            localStorage.setItem('authSystemData', JSON.stringify(dataToSave));
+        }
 
         // DOM Elements
         const app = document.getElementById('app');
@@ -376,8 +409,32 @@
                         <button onclick="logout()" style="width:auto; padding:8px 15px;">Logout</button>
                     </div>
                     <div class="dashboard-content">
+                        <button class="download-btn" onclick="downloadUserData()">Download Users Data (JSON)</button>
                         <h3>Registered Users</h3>
                         <div id="users-list"></div>
+                    </div>
+                </div>
+            `,
+
+            'admin-settings': `
+                <div>
+                    <div class="dashboard-header">
+                        <h2>Admin Settings</h2>
+                        <button onclick="navigate('admin-dashboard')" style="width:auto; padding:8px 15px;">← Back</button>
+                    </div>
+                    <div class="dashboard-content">
+                        <h3>Change Admin Credentials</h3>
+                        <div class="input-group">
+                            <input type="text" id="newAdminUsername" placeholder=" " value="${state.adminCredentials.username}">
+                            <label for="newAdminUsername">New Username</label>
+                        </div>
+                        <div class="input-group">
+                            <input type="password" id="newAdminPassword" placeholder=" ">
+                            <label for="newAdminPassword">New Password</label>
+                            <span class="toggle-password" onclick="togglePassword('newAdminPassword')">👁️</span>
+                        </div>
+                        <button onclick="updateAdminCredentials()">Update Credentials</button>
+                        <div id="adminSettingsMessage" class="error"></div>
                     </div>
                 </div>
             `
@@ -388,7 +445,6 @@
             state.currentView = view;
             render();
             
-            // If navigating to dashboard views, load appropriate data
             if (view === 'user-dashboard' && state.loggedInUser) {
                 document.getElementById('user-name').textContent = state.loggedInUser.fullname;
                 document.getElementById('user-email').textContent = state.loggedInUser.email;
@@ -443,14 +499,16 @@
 
             // Add new user
             const newUser = {
+                id: Date.now().toString(),
                 fullname,
                 email,
                 phone,
-                password
+                password,
+                createdAt: new Date().toISOString()
             };
 
             state.users.push(newUser);
-            localStorage.setItem('users', JSON.stringify(state.users));
+            saveData();
 
             // Show success message
             message.textContent = 'Registration successful! Redirecting to login...';
@@ -492,6 +550,27 @@
             }
         }
 
+        // Update admin credentials
+        function updateAdminCredentials() {
+            const newUsername = document.getElementById('newAdminUsername').value;
+            const newPassword = document.getElementById('newAdminPassword').value;
+            const message = document.getElementById('adminSettingsMessage');
+
+            if (!newUsername || !newPassword) {
+                message.textContent = 'Both fields are required!';
+                return;
+            }
+
+            state.adminCredentials = {
+                username: newUsername,
+                password: newPassword
+            };
+            saveData();
+
+            message.textContent = 'Admin credentials updated successfully!';
+            message.className = 'success';
+        }
+
         // Logout function
         function logout() {
             state.loggedInUser = null;
@@ -504,6 +583,11 @@
             const usersList = document.getElementById('users-list');
             usersList.innerHTML = '';
 
+            if (state.users.length === 0) {
+                usersList.innerHTML = '<p>No users registered yet.</p>';
+                return;
+            }
+
             state.users.forEach((user, index) => {
                 const userCard = document.createElement('div');
                 userCard.className = 'user-card';
@@ -511,6 +595,7 @@
                     <h3>${user.fullname}</h3>
                     <p><strong>Email:</strong> ${user.email}</p>
                     <p><strong>Phone:</strong> ${user.phone}</p>
+                    <p><strong>Registered:</strong> ${new Date(user.createdAt).toLocaleString()}</p>
                     <div class="action-buttons">
                         <button class="edit-btn" onclick="editUser(${index})">Edit</button>
                         <button class="delete-btn" onclick="deleteUser(${index})">Delete</button>
@@ -534,7 +619,7 @@
                     email: newEmail,
                     phone: newPhone
                 };
-                localStorage.setItem('users', JSON.stringify(state.users));
+                saveData();
                 renderUsersList();
             }
         }
@@ -543,19 +628,28 @@
         function deleteUser(index) {
             if (confirm('Are you sure you want to delete this user?')) {
                 state.users.splice(index, 1);
-                localStorage.setItem('users', JSON.stringify(state.users));
+                saveData();
                 renderUsersList();
             }
         }
 
-        // Initialize the app
-        function init() {
-            // Check if user is already logged in (for page refresh)
-            if (state.loggedInUser) {
-                navigate(state.isAdmin ? 'admin-dashboard' : 'user-dashboard');
-            } else {
-                navigate('home');
-            }
+        // Download user data as JSON file
+        function downloadUserData() {
+            const data = {
+                users: state.users,
+                adminCredentials: state.adminCredentials,
+                exportedAt: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = `users-data-${new Date().toISOString().slice(0,10)}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
         }
 
         // Make functions globally available
@@ -567,6 +661,20 @@
         window.logout = logout;
         window.editUser = editUser;
         window.deleteUser = deleteUser;
+        window.updateAdminCredentials = updateAdminCredentials;
+        window.downloadUserData = downloadUserData;
+
+        // Initialize the app
+        function init() {
+            initializeData();
+            
+            // Check if user is already logged in (for page refresh)
+            if (state.loggedInUser) {
+                navigate(state.isAdmin ? 'admin-dashboard' : 'user-dashboard');
+            } else {
+                navigate('home');
+            }
+        }
 
         // Start the app
         init();
