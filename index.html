@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth System</title>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --accent: #4895ef;
+            --danger: #f72585;
+            --success: #4cc9f0;
+            --light: #f8f9fa;
+            --dark: #212529;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .form-container {
+            padding: 40px;
+        }
+
+        h2 {
+            color: var(--primary);
+            margin-bottom: 30px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+        }
+
+        .input-group label {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            color: #6c757d;
+            font-size: 16px;
+            transition: all 0.3s;
+            pointer-events: none;
+        }
+
+        .input-group input:focus + label,
+        .input-group input:not(:placeholder-shown) + label {
+            top: -10px;
+            left: 10px;
+            font-size: 12px;
+            background-color: white;
+            padding: 0 5px;
+            color: var(--primary);
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: var(--secondary);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .message {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .message a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .message a:hover {
+            text-decoration: underline;
+        }
+
+        .error {
+            color: var(--danger);
+            text-align: center;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .success {
+            color: var(--success);
+            text-align: center;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            cursor: pointer;
+            color: #6c757d;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .logo img {
+            width: 80px;
+            height: 80px;
+        }
+
+        .auth-options {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+
+        .auth-options button {
+            width: 48%;
+            background-color: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .auth-options button:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        /* Dashboard styles */
+        .dashboard-header {
+            background-color: var(--primary);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dashboard-content {
+            padding: 30px;
+        }
+
+        .user-card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .user-card h3 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .user-card p {
+            margin-bottom: 8px;
+            color: var(--dark);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .action-buttons button {
+            flex: 1;
+            padding: 10px;
+        }
+
+        .edit-btn {
+            background-color: var(--accent);
+        }
+
+        .delete-btn {
+            background-color: var(--danger);
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-container {
+            animation: fadeIn 0.5s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <!-- Content will be dynamically loaded here -->
+    </div>
+
+    <script>
+        // Main App State
+        const state = {
+            currentView: 'home',
+            users: JSON.parse(localStorage.getItem('users')) || [],
+            adminCredentials: {
+                username: 'admin',
+                password: 'admin123'
+            },
+            loggedInUser: null,
+            isAdmin: false
+        };
+
+        // DOM Elements
+        const app = document.getElementById('app');
+
+        // Views
+        const views = {
+            home: `
+                <div class="form-container">
+                    <div class="logo">
+                        <img src="https://via.placeholder.com/80" alt="Logo">
+                    </div>
+                    <h2>Welcome to Auth System</h2>
+                    <div class="auth-options">
+                        <button onclick="navigate('register')">Register</button>
+                        <button onclick="navigate('login')">Login</button>
+                    </div>
+                    <div class="auth-options">
+                        <button onclick="navigate('admin-login')" style="width:100%">Admin Login</button>
+                    </div>
+                </div>
+            `,
+
+            register: `
+                <div class="form-container">
+                    <h2>Create Account</h2>
+                    <div class="input-group">
+                        <input type="text" id="fullname" placeholder=" ">
+                        <label for="fullname">Full Name</label>
+                    </div>
+                    <div class="input-group">
+                        <input type="email" id="email" placeholder=" ">
+                        <label for="email">Email</label>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="phone" placeholder=" ">
+                        <label for="phone">Phone Number</label>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="password" placeholder=" ">
+                        <label for="password">Password</label>
+                        <span class="toggle-password" onclick="togglePassword('password')">👁️</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="confirmPassword" placeholder=" ">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <span class="toggle-password" onclick="togglePassword('confirmPassword')">👁️</span>
+                    </div>
+                    <button onclick="register()">Register</button>
+                    <div id="registerMessage" class="error"></div>
+                    <div class="message">
+                        Already have an account? <a href="#" onclick="navigate('login')">Login</a>
+                    </div>
+                </div>
+            `,
+
+            login: `
+                <div class="form-container">
+                    <h2>User Login</h2>
+                    <div class="input-group">
+                        <input type="text" id="loginPhone" placeholder=" ">
+                        <label for="loginPhone">Phone Number</label>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="loginPassword" placeholder=" ">
+                        <label for="loginPassword">Password</label>
+                        <span class="toggle-password" onclick="togglePassword('loginPassword')">👁️</span>
+                    </div>
+                    <button onclick="userLogin()">Login</button>
+                    <div id="loginMessage" class="error"></div>
+                    <div class="message">
+                        Don't have an account? <a href="#" onclick="navigate('register')">Register</a>
+                    </div>
+                </div>
+            `,
+
+            'admin-login': `
+                <div class="form-container">
+                    <h2>Admin Login</h2>
+                    <div class="input-group">
+                        <input type="text" id="adminUsername" placeholder=" ">
+                        <label for="adminUsername">Username</label>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="adminPassword" placeholder=" ">
+                        <label for="adminPassword">Password</label>
+                        <span class="toggle-password" onclick="togglePassword('adminPassword')">👁️</span>
+                    </div>
+                    <button onclick="adminLogin()">Login</button>
+                    <div id="adminMessage" class="error"></div>
+                    <div class="message">
+                        <a href="#" onclick="navigate('home')">← Back to Home</a>
+                    </div>
+                </div>
+            `,
+
+            'user-dashboard': `
+                <div>
+                    <div class="dashboard-header">
+                        <h2>User Dashboard</h2>
+                        <button onclick="logout()" style="width:auto; padding:8px 15px;">Logout</button>
+                    </div>
+                    <div class="dashboard-content">
+                        <div class="user-card">
+                            <h3>Your Profile</h3>
+                            <p><strong>Name:</strong> <span id="user-name"></span></p>
+                            <p><strong>Email:</strong> <span id="user-email"></span></p>
+                            <p><strong>Phone:</strong> <span id="user-phone"></span></p>
+                        </div>
+                    </div>
+                </div>
+            `,
+
+            'admin-dashboard': `
+                <div>
+                    <div class="dashboard-header">
+                        <h2>Admin Dashboard</h2>
+                        <button onclick="logout()" style="width:auto; padding:8px 15px;">Logout</button>
+                    </div>
+                    <div class="dashboard-content">
+                        <h3>Registered Users</h3>
+                        <div id="users-list"></div>
+                    </div>
+                </div>
+            `
+        };
+
+        // Navigation function
+        function navigate(view) {
+            state.currentView = view;
+            render();
+            
+            // If navigating to dashboard views, load appropriate data
+            if (view === 'user-dashboard' && state.loggedInUser) {
+                document.getElementById('user-name').textContent = state.loggedInUser.fullname;
+                document.getElementById('user-email').textContent = state.loggedInUser.email;
+                document.getElementById('user-phone').textContent = state.loggedInUser.phone;
+            } else if (view === 'admin-dashboard') {
+                renderUsersList();
+            }
+        }
+
+        // Render function
+        function render() {
+            app.innerHTML = views[state.currentView];
+        }
+
+        // Toggle password visibility
+        function togglePassword(id) {
+            const input = document.getElementById(id);
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        // Registration function
+        function register() {
+            const fullname = document.getElementById('fullname').value;
+            const email = document.getElementById('email').value;
+            const phone = document.getElementById('phone').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const message = document.getElementById('registerMessage');
+
+            // Validation
+            if (!fullname || !email || !phone || !password || !confirmPassword) {
+                message.textContent = 'All fields are required!';
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                message.textContent = 'Passwords do not match!';
+                return;
+            }
+
+            if (password.length < 6) {
+                message.textContent = 'Password must be at least 6 characters!';
+                return;
+            }
+
+            // Check if user already exists
+            const userExists = state.users.some(user => user.email === email || user.phone === phone);
+            if (userExists) {
+                message.textContent = 'User with this email or phone already exists!';
+                return;
+            }
+
+            // Add new user
+            const newUser = {
+                fullname,
+                email,
+                phone,
+                password
+            };
+
+            state.users.push(newUser);
+            localStorage.setItem('users', JSON.stringify(state.users));
+
+            // Show success message
+            message.textContent = 'Registration successful! Redirecting to login...';
+            message.className = 'success';
+            
+            // Redirect to login after 2 seconds
+            setTimeout(() => navigate('login'), 2000);
+        }
+
+        // User login function
+        function userLogin() {
+            const phone = document.getElementById('loginPhone').value;
+            const password = document.getElementById('loginPassword').value;
+            const message = document.getElementById('loginMessage');
+
+            // Find user
+            const user = state.users.find(u => u.phone === phone && u.password === password);
+
+            if (user) {
+                state.loggedInUser = user;
+                state.isAdmin = false;
+                navigate('user-dashboard');
+            } else {
+                message.textContent = 'Invalid phone number or password!';
+            }
+        }
+
+        // Admin login function
+        function adminLogin() {
+            const username = document.getElementById('adminUsername').value;
+            const password = document.getElementById('adminPassword').value;
+            const message = document.getElementById('adminMessage');
+
+            if (username === state.adminCredentials.username && password === state.adminCredentials.password) {
+                state.isAdmin = true;
+                navigate('admin-dashboard');
+            } else {
+                message.textContent = 'Invalid admin credentials!';
+            }
+        }
+
+        // Logout function
+        function logout() {
+            state.loggedInUser = null;
+            state.isAdmin = false;
+            navigate('home');
+        }
+
+        // Render users list for admin
+        function renderUsersList() {
+            const usersList = document.getElementById('users-list');
+            usersList.innerHTML = '';
+
+            state.users.forEach((user, index) => {
+                const userCard = document.createElement('div');
+                userCard.className = 'user-card';
+                userCard.innerHTML = `
+                    <h3>${user.fullname}</h3>
+                    <p><strong>Email:</strong> ${user.email}</p>
+                    <p><strong>Phone:</strong> ${user.phone}</p>
+                    <div class="action-buttons">
+                        <button class="edit-btn" onclick="editUser(${index})">Edit</button>
+                        <button class="delete-btn" onclick="deleteUser(${index})">Delete</button>
+                    </div>
+                `;
+                usersList.appendChild(userCard);
+            });
+        }
+
+        // Edit user function
+        function editUser(index) {
+            const user = state.users[index];
+            const newName = prompt('Enter new name:', user.fullname);
+            const newEmail = prompt('Enter new email:', user.email);
+            const newPhone = prompt('Enter new phone:', user.phone);
+
+            if (newName && newEmail && newPhone) {
+                state.users[index] = {
+                    ...user,
+                    fullname: newName,
+                    email: newEmail,
+                    phone: newPhone
+                };
+                localStorage.setItem('users', JSON.stringify(state.users));
+                renderUsersList();
+            }
+        }
+
+        // Delete user function
+        function deleteUser(index) {
+            if (confirm('Are you sure you want to delete this user?')) {
+                state.users.splice(index, 1);
+                localStorage.setItem('users', JSON.stringify(state.users));
+                renderUsersList();
+            }
+        }
+
+        // Initialize the app
+        function init() {
+            // Check if user is already logged in (for page refresh)
+            if (state.loggedInUser) {
+                navigate(state.isAdmin ? 'admin-dashboard' : 'user-dashboard');
+            } else {
+                navigate('home');
+            }
+        }
+
+        // Make functions globally available
+        window.navigate = navigate;
+        window.togglePassword = togglePassword;
+        window.register = register;
+        window.userLogin = userLogin;
+        window.adminLogin = adminLogin;
+        window.logout = logout;
+        window.editUser = editUser;
+        window.deleteUser = deleteUser;
+
+        // Start the app
+        init();
+    </script>
+</body>
+</html>
