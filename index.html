@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auth System</title>
+    <title>User-Admin Auth System</title>
     <style>
         :root {
             --primary: #4361ee;
@@ -229,6 +229,31 @@
             background-color: var(--danger);
         }
 
+        /* Data transfer styles */
+        .qr-code {
+            margin: 20px auto;
+            padding: 10px;
+            background: white;
+            width: 200px;
+            height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid #ddd;
+        }
+
+        .data-transfer {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .download-btn {
+            background-color: var(--success);
+            margin-bottom: 20px;
+        }
+
         /* Animation */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
@@ -238,12 +263,6 @@
         .form-container {
             animation: fadeIn 0.5s ease-out;
         }
-        
-        /* Download button */
-        .download-btn {
-            background-color: var(--success);
-            margin-bottom: 20px;
-        }
     </style>
 </head>
 <body>
@@ -251,11 +270,14 @@
         <!-- Content will be dynamically loaded here -->
     </div>
 
+    <!-- QR Code Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    
     <script>
         // Main App State
         const state = {
             currentView: 'home',
-            users: [],
+            users: JSON.parse(localStorage.getItem('allUsersData')) || [],
             adminCredentials: {
                 username: 'admin',
                 password: 'admin123'
@@ -264,35 +286,60 @@
             isAdmin: false
         };
 
-        // Initialize data from JSON file if exists
-        function initializeData() {
+        // Save all users data
+        function saveAllUsers() {
+            localStorage.setItem('allUsersData', JSON.stringify(state.users));
+        }
+
+        // Save admin credentials
+        function saveAdminCredentials() {
+            localStorage.setItem('adminCredentials', JSON.stringify(state.adminCredentials));
+        }
+
+        // Generate QR code for data
+        function generateQR(data) {
+            return new Promise((resolve) => {
+                QRCode.toDataURL(JSON.stringify(data), { width: 200 }, (err, url) => {
+                    if (err) console.error(err);
+                    resolve(url);
+                });
+            });
+        }
+
+        // Load data from QR code or JSON
+        function loadExternalData(data) {
             try {
-                const storedData = localStorage.getItem('authSystemData');
-                if (storedData) {
-                    const parsedData = JSON.parse(storedData);
-                    state.users = parsedData.users || [];
+                const parsedData = JSON.parse(data);
+                
+                if (parsedData.type === 'user-registration') {
+                    // Add new user from QR code
+                    const userExists = state.users.some(user => 
+                        user.phone === parsedData.user.phone || 
+                        user.email === parsedData.user.email
+                    );
                     
-                    // Check if admin credentials exist in storage
-                    if (parsedData.adminCredentials) {
-                        state.adminCredentials = parsedData.adminCredentials;
+                    if (!userExists) {
+                        state.users.push(parsedData.user);
+                        saveAllUsers();
+                        return true;
                     }
+                } else if (Array.isArray(parsedData.users)) {
+                    // Import multiple users from JSON
+                    parsedData.users.forEach(user => {
+                        const exists = state.users.some(u => 
+                            u.phone === user.phone || 
+                            u.email === user.email
+                        );
+                        if (!exists) state.users.push(user);
+                    });
+                    saveAllUsers();
+                    return true;
                 }
             } catch (e) {
-                console.error("Error loading data:", e);
+                console.error("Error loading external data:", e);
             }
+            return false;
         }
-
-        // Save data to localStorage as JSON
-        function saveData() {
-            const dataToSave = {
-                users: state.users,
-                adminCredentials: state.adminCredentials
-            };
-            localStorage.setItem('authSystemData', JSON.stringify(dataToSave));
-        }
-
-        // DOM Elements
-        const app = document.getElementById('app');
 
         // Views
         const views = {
@@ -398,6 +445,16 @@
                             <p><strong>Email:</strong> <span id="user-email"></span></p>
                             <p><strong>Phone:</strong> <span id="user-phone"></span></p>
                         </div>
+                        
+                        <div class="data-transfer">
+                            <h4>Share your registration with admin:</h4>
+                            <div id="user-qr-code" class="qr-code">
+                                <p>Generate QR code to share</p>
+                            </div>
+                            <button onclick="generateUserQR()">Generate QR Code</button>
+                            <button onclick="downloadUserData()">Download Data File</button>
+                            <p>Show this to admin to add your account to their system</p>
+                        </div>
                     </div>
                 </div>
             `,
@@ -406,11 +463,20 @@
                 <div>
                     <div class="dashboard-header">
                         <h2>Admin Dashboard</h2>
+                        <button onclick="navigate('admin-settings')" style="width:auto; padding:8px 15px;">Settings</button>
                         <button onclick="logout()" style="width:auto; padding:8px 15px;">Logout</button>
                     </div>
                     <div class="dashboard-content">
-                        <button class="download-btn" onclick="downloadUserData()">Download Users Data (JSON)</button>
-                        <h3>Registered Users</h3>
+                        <div class="data-transfer">
+                            <h4>Add users from other devices:</h4>
+                            <input type="file" id="json-upload" accept=".json" style="display: none;" onchange="handleJsonUpload(event)">
+                            <button onclick="document.getElementById('json-upload').click()">Import JSON File</button>
+                            <button onclick="addUserManually()">Add User Manually</button>
+                        </div>
+                        
+                        <button class="download-btn" onclick="downloadAllUserData()">Download All Users Data</button>
+                        
+                        <h3>Registered Users (${state.users.length})</h3>
                         <div id="users-list"></div>
                     </div>
                 </div>
@@ -435,6 +501,12 @@
                         </div>
                         <button onclick="updateAdminCredentials()">Update Credentials</button>
                         <div id="adminSettingsMessage" class="error"></div>
+                        
+                        <div class="data-transfer" style="margin-top: 30px;">
+                            <h3>System Management</h3>
+                            <button onclick="clearAllData()" style="background-color: var(--danger);">Reset All Data</button>
+                            <p>Warning: This will delete all users and settings</p>
+                        </div>
                     </div>
                 </div>
             `
@@ -508,14 +580,18 @@
             };
 
             state.users.push(newUser);
-            saveData();
+            saveAllUsers();
+
+            // Auto-login after registration
+            state.loggedInUser = newUser;
+            state.isAdmin = false;
 
             // Show success message
-            message.textContent = 'Registration successful! Redirecting to login...';
+            message.textContent = 'Registration successful!';
             message.className = 'success';
             
-            // Redirect to login after 2 seconds
-            setTimeout(() => navigate('login'), 2000);
+            // Redirect to dashboard after 1 second
+            setTimeout(() => navigate('user-dashboard'), 1000);
         }
 
         // User login function
@@ -565,7 +641,7 @@
                 username: newUsername,
                 password: newPassword
             };
-            saveData();
+            saveAdminCredentials();
 
             message.textContent = 'Admin credentials updated successfully!';
             message.className = 'success';
@@ -619,7 +695,7 @@
                     email: newEmail,
                     phone: newPhone
                 };
-                saveData();
+                saveAllUsers();
                 renderUsersList();
             }
         }
@@ -628,13 +704,76 @@
         function deleteUser(index) {
             if (confirm('Are you sure you want to delete this user?')) {
                 state.users.splice(index, 1);
-                saveData();
+                saveAllUsers();
                 renderUsersList();
             }
         }
 
-        // Download user data as JSON file
+        // Add user manually (admin)
+        function addUserManually() {
+            const fullname = prompt("Enter user's full name:");
+            const email = prompt("Enter user's email:");
+            const phone = prompt("Enter user's phone number:");
+            const password = prompt("Set temporary password:");
+
+            if (fullname && email && phone && password) {
+                const userExists = state.users.some(user => user.email === email || user.phone === phone);
+                
+                if (userExists) {
+                    alert('User with this email or phone already exists!');
+                    return;
+                }
+
+                state.users.push({
+                    id: Date.now().toString(),
+                    fullname,
+                    email,
+                    phone,
+                    password,
+                    createdAt: new Date().toISOString()
+                });
+                saveAllUsers();
+                renderUsersList();
+                alert('User added successfully!');
+            }
+        }
+
+        // Generate QR code for user data
+        async function generateUserQR() {
+            if (!state.loggedInUser) return;
+            
+            const userData = {
+                type: 'user-registration',
+                user: state.loggedInUser,
+                timestamp: new Date().toISOString()
+            };
+            
+            const qrCode = await generateQR(userData);
+            document.getElementById('user-qr-code').innerHTML = `<img src="${qrCode}" alt="User Data QR Code">`;
+        }
+
+        // Download user's own data
         function downloadUserData() {
+            if (!state.loggedInUser) return;
+            
+            const data = {
+                type: 'user-registration',
+                user: state.loggedInUser,
+                timestamp: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const fileName = `user-${state.loggedInUser.phone}.json`;
+            
+            const link = document.createElement('a');
+            link.setAttribute('href', dataUri);
+            link.setAttribute('download', fileName);
+            link.click();
+        }
+
+        // Download all users data (admin)
+        function downloadAllUserData() {
             const data = {
                 users: state.users,
                 adminCredentials: state.adminCredentials,
@@ -643,13 +782,73 @@
             
             const dataStr = JSON.stringify(data, null, 2);
             const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const fileName = `all-users-${new Date().toISOString().slice(0,10)}.json`;
             
-            const exportFileDefaultName = `users-data-${new Date().toISOString().slice(0,10)}.json`;
+            const link = document.createElement('a');
+            link.setAttribute('href', dataUri);
+            link.setAttribute('download', fileName);
+            link.click();
+        }
+
+        // Handle JSON file upload
+        function handleJsonUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
             
-            const linkElement = document.createElement('a');
-            linkElement.setAttribute('href', dataUri);
-            linkElement.setAttribute('download', exportFileDefaultName);
-            linkElement.click();
+            const reader = new FileReader();
+            
+            reader.onload = (event) => {
+                const success = loadExternalData(event.target.result);
+                if (success) {
+                    alert('User data imported successfully!');
+                    renderUsersList();
+                } else {
+                    alert('Error importing user data or user already exists!');
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+
+        // Clear all data
+        function clearAllData() {
+            if (confirm('Are you sure you want to delete ALL data? This cannot be undone!')) {
+                localStorage.clear();
+                state.users = [];
+                state.loggedInUser = null;
+                state.isAdmin = false;
+                state.adminCredentials = {
+                    username: 'admin',
+                    password: 'admin123'
+                };
+                saveAdminCredentials();
+                alert('All data has been reset!');
+                navigate('home');
+            }
+        }
+
+        // Initialize the app
+        function init() {
+            // Load admin credentials if they exist
+            const savedAdmin = localStorage.getItem('adminCredentials');
+            if (savedAdmin) {
+                state.adminCredentials = JSON.parse(savedAdmin);
+            }
+            
+            // Check if we should stay logged in
+            const savedUser = localStorage.getItem('lastLoggedInUser');
+            if (savedUser) {
+                const user = JSON.parse(savedUser);
+                const foundUser = state.users.find(u => u.id === user.id);
+                if (foundUser) {
+                    state.loggedInUser = foundUser;
+                    state.isAdmin = false;
+                    navigate('user-dashboard');
+                    return;
+                }
+            }
+            
+            navigate('home');
         }
 
         // Make functions globally available
@@ -662,22 +861,15 @@
         window.editUser = editUser;
         window.deleteUser = deleteUser;
         window.updateAdminCredentials = updateAdminCredentials;
+        window.generateUserQR = generateUserQR;
         window.downloadUserData = downloadUserData;
-
-        // Initialize the app
-        function init() {
-            initializeData();
-            
-            // Check if user is already logged in (for page refresh)
-            if (state.loggedInUser) {
-                navigate(state.isAdmin ? 'admin-dashboard' : 'user-dashboard');
-            } else {
-                navigate('home');
-            }
-        }
+        window.downloadAllUserData = downloadAllUserData;
+        window.handleJsonUpload = handleJsonUpload;
+        window.addUserManually = addUserManually;
+        window.clearAllData = clearAllData;
 
         // Start the app
         init();
     </script>
 </body>
-</html>
+    </html>
